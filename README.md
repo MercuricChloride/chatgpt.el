@@ -1,13 +1,13 @@
-# chat-gpt-emacs
+# chatgpt-emacs
 
-A plugin for emacs that adds chat-gpt support
+A plugin for emacs that adds chatgpt support
 
 # Usage
 
-To use this plugin, you must define you chat-gpt-api-key in your .emacs file.
+To use this plugin, you must define you chatgpt-api-key in your .emacs file.
 
 ```emacs-lisp
-(setq chat-gpt-api-key "YOUR_API_KEY")
+(setq chatgpt-api-key "YOUR_API_KEY")
 ```
 
-Then, you can use the command `chat-gpt-reply` to start a chat with the bot.
+Then, you can use the command `chatgpt-reply` to start a chat with the bot.

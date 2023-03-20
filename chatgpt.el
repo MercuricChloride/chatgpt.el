@@ -51,61 +51,61 @@
   (json-encode
    `(:model "gpt-3.5-turbo"
      :messages [
-      (:role "system"
-      :content "You are a helpful assistant.")
-      (:role "user"
-      :content ,user-message)])))
+                (:role "system"
+                 :content "You are a helpful assistant.")
+                (:role "user"
+                 :content ,user-message)])))
 
 ;; Define utility functions
 (defun chatgpt--api-request (user-message &optional sync)
   "Send a text message to the ChatGPT API and return the response."
-        (chatgpt--open-window "Loading Response...")
-        (request chatgpt-api-url
-        :type "POST"
-        :headers `(("Authorization" . ,(format "Bearer %s" chatgpt-api-key))
-                   ("Content-Type" . "application/json"))
-        :data (chatgpt-format-request user-message)
-        :parser 'json-read
-        :sync sync
-        :success (cl-function
-                (lambda (&key data &allow-other-keys)
+  (chatgpt--open-window "Loading Response...")
+  (request chatgpt-api-url
+    :type "POST"
+    :headers `(("Authorization" . ,(format "Bearer %s" chatgpt-api-key))
+               ("Content-Type" . "application/json"))
+    :data (chatgpt-format-request user-message)
+    :parser 'json-read
+    :sync sync
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
                 (chatgpt--parse-response data)))
-        :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                        (chatgpt--open-window "Error: API request failed.")))))
+    :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                          (chatgpt--open-window "Error: API request failed.")))))
 
 (defun chatgpt--parse-response (response)
   (let ((choices (assoc-default 'choices response)) (response-message nil))
-        (setq response-message
-         (assoc-default 'content
-         (assoc-default 'message
-                        (elt choices 0))))
-        (setq chatgpt-latest-response response-message)
-        (chatgpt--open-window response-message)
-        response-message)
+    (setq response-message
+          (assoc-default 'content
+                         (assoc-default 'message
+                                        (elt choices 0))))
+    (setq chatgpt-latest-response response-message)
+    (chatgpt--open-window response-message)
+    response-message)
   "Parse the response from the ChatGPT API and return the text.")
 
 (defun chatgpt-paste-response ()
   "Paste the latest response from the ChatGPT API into the current buffer."
   (interactive
-  (insert chatgpt-latest-response)))
+   (insert chatgpt-latest-response)))
 
 (defun chatgpt--open-window (message)
-      (if (< (length (window-list)) 2)
-        (split-window-right -75))
-      (select-window (window-in-direction 'right))
-      (let ((gpt-buffer (get-buffer "ChatGPT Dialogue")))
-        (if gpt-buffer
-                (progn
-                (switch-to-buffer gpt-buffer)
-                (erase-buffer))
+  (if (< (length (window-list)) 2)
+      (split-window-right -75))
+  (select-window (window-in-direction 'right))
+  (let ((gpt-buffer (get-buffer "ChatGPT Dialogue")))
+    (if gpt-buffer
+        (progn
+          (switch-to-buffer gpt-buffer)
+          (erase-buffer))
 
-                (progn
-                (generate-new-buffer "ChatGPT Dialogue"))
-                (switch-to-buffer (get-buffer "ChatGPT Dialogue")))
-        (visual-line-mode 1)
-        (insert message)
-        ;(switch-to-prev-buffer)
-        (select-window (window-in-direction 'left))))
+      (progn
+        (generate-new-buffer "ChatGPT Dialogue"))
+      (switch-to-buffer (get-buffer "ChatGPT Dialogue")))
+    (visual-line-mode 1)
+    (insert message)
+                                        ;(switch-to-prev-buffer)
+    (select-window (window-in-direction 'left))))
 
 ;; Define interactive functions
 (defun chatgpt-reply ()
@@ -120,13 +120,16 @@
   (let ((message (read-string "Message: ")))
     (message "Sending message...")
     (chatgpt--api-request message t)
-    (insert chatgpt-latest-response)))
+    (let ((point (point)))
+      (insert chatgpt-latest-response)
+      (goto-char point))))
 
 (defun chatgpt-paste ()
   "Paste the latest response from the ChatGPT API into the current buffer."
   (interactive)
-  (insert chatgpt-latest-response)
-  (move-end-of-line -1))
+  (let ((point (point)))
+    (insert chatgpt-latest-response)
+    (goto-char point)))
 
 ;; Define mode
 (define-minor-mode chatgpt-mode

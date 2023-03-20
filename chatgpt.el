@@ -36,15 +36,15 @@
 ;; Define package-level variables and constants
 (defcustom chatgpt-api-key
   nil
-  "The API key for the ChatGPT API"
+  "The API key for the ChatGPT API."
   :type 'string
   :group 'chatgpt)
 
 (defvar chatgpt-api-url "https://api.openai.com/v1/chat/completions"
-  "URL for ChatGPT API")
+  "URL for ChatGPT API.")
 
 (defvar chatgpt-latest-response nil
-  "Latest response from the ChatGPT API")
+  "Latest response from the ChatGPT API.")
 
 (defun chatgpt-format-request (user-message)
   "Format a USER-MESSAGE to the ChatGPT API."
@@ -58,7 +58,7 @@
 
 ;; Define utility functions
 (defun chatgpt--api-request (user-message &optional sync)
-  "Send a text message to the ChatGPT API and return the response."
+  "Send a USER-MESSAGE to the ChatGPT API and return the response. \nIf SYNC is non-nil, return the response synchronously."
   (chatgpt--open-window "Loading Response...")
   (request chatgpt-api-url
     :type "POST"
@@ -74,6 +74,7 @@
                           (chatgpt--open-window "Error: API request failed.")))))
 
 (defun chatgpt--parse-response (response)
+  "Parse the RESPONSE from the ChatGPT API and return the text."
   (let ((choices (assoc-default 'choices response)) (response-message nil))
     (setq response-message
           (assoc-default 'content
@@ -90,6 +91,7 @@
    (insert chatgpt-latest-response)))
 
 (defun chatgpt--open-window (message)
+  "Open a window to display a MESSAGE."
   (if (< (length (window-list)) 2)
       (split-window-right -75))
   (select-window (window-in-direction 'right))
@@ -104,12 +106,11 @@
       (switch-to-buffer (get-buffer "ChatGPT Dialogue")))
     (visual-line-mode 1)
     (insert message)
-                                        ;(switch-to-prev-buffer)
     (select-window (window-in-direction 'left))))
 
 ;; Define interactive functions
 (defun chatgpt-reply ()
-  "Get a reply from ChatGPT"
+  "Get a reply from ChatGPT."
   (interactive)
   (let ((message (read-string "Message: ")))
     (chatgpt--api-request message)))
@@ -133,7 +134,7 @@
 
 ;; Define mode
 (define-minor-mode chatgpt-mode
-  "Minor mode for integrating ChatGPT into Emacs"
+  "Minor mode for integrating ChatGPT into Emacs."
   :lighter " ChatGPT")
 
 (provide 'chatgpt)

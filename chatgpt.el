@@ -37,7 +37,7 @@
 (defcustom chatgpt-api-key
   nil
   "The API key for the ChatGPT API"
-  :type 'variable
+  :type 'string
   :group 'chatgpt)
 
 (defvar chatgpt-api-url "https://api.openai.com/v1/chat/completions"
@@ -121,6 +121,12 @@
     (message "Sending message...")
     (chatgpt--api-request message t)
     (insert chatgpt-latest-response)))
+
+(defun chatgpt-paste ()
+  "Paste the latest response from the ChatGPT API into the current buffer."
+  (interactive)
+  (insert chatgpt-latest-response)
+  (move-end-of-line -1))
 
 ;; Define mode
 (define-minor-mode chatgpt-mode

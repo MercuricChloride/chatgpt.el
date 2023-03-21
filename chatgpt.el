@@ -125,6 +125,30 @@
       (insert chatgpt-latest-response)
       (goto-char point))))
 
+(defun chatgpt-explain-region ()
+  "Explain the selected region using the ChatGPT API."
+  (interactive)
+  (let ((message (concat "Explain the following code: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (chatgpt--api-request message)))
+
+(defun chatgpt-refactor-region ()
+  "Refactor the selected region using the ChatGPT API."
+  (interactive)
+  (let ((message (concat "Refactor the following code." (read-string "How should we refactor this code?") "\n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (chatgpt--api-request message)))
+
+(defun chatgpt-document-region ()
+  "Document the selected region using the ChatGPT API."
+  (interactive)
+  (let ((message (concat "Return this code, but with documentation added as comments to the code: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (chatgpt--api-request message)))
+
+(defun chatgpt-prompt-region ()
+  "Prompt the user for a message and send the selected region as a context."
+  (interactive)
+  (let ((message (read-string "Message: ")))
+    (chatgpt--api-request (concat message "\n" (buffer-substring-no-properties (region-beginning) (region-end))))))
+
 (defun chatgpt-paste ()
   "Paste the latest response from the ChatGPT API into the current buffer."
   (interactive)

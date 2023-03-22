@@ -156,6 +156,12 @@
     (insert chatgpt-latest-response)
     (goto-char point)))
 
+(defun chatgpt-skyrimify ()
+  "Rewrite the selected region of org todo items as Skyrim quests"
+  (interactive)
+        (let ((message (concat "Rewrite the following org todo items as Skyrim quests. Rewrite the original todo item in parens at the end of the line.: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+        (chatgpt--api-request message)))
+
 ;; Define mode
 (define-minor-mode chatgpt-mode
   "Minor mode for integrating ChatGPT into Emacs."

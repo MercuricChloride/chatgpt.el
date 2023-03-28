@@ -5,6 +5,7 @@
 ;; Author: Alexander Gusev <goose@soulbound.xyz>
 ;; Maintainer: Alexander Gusev <goose@soulbound.xyz>
 ;; Created: March 20, 2023
+
 ;; Modified: March 20, 2023
 ;; Version: 0.0.1
 
@@ -40,25 +41,33 @@
   :type 'string
   :group 'chatgpt)
 
-(defvar chatgpt-api-url "https://api.openai.com/v1/chat/completions"
-  "URL for ChatGPT API.")
+(defvar chatgpt-model
+  "gpt-4"
+  "The model to use. \"gpt-3.5-turbo\" or \"gpt-4\"")
+
+(defvar chatgpt-api-url
+  "https://api.openai.com/v1/chat/completions"
+  "URL for ChatGPT API. ")
 
 (defvar chatgpt-latest-response nil
   "Latest response from the ChatGPT API.")
 
+(defvar chatgpt-history []
+  "History of messages sent to the ChatGPT API.")
+
 (defun chatgpt-format-request (user-message)
   "Format a USER-MESSAGE to the ChatGPT API."
   (json-encode
-   `(:model "gpt-3.5-turbo"
-     :messages [
-                (:role "system"
-                 :content "You are a helpful assistant.")
-                (:role "user"
-                 :content ,user-message)])))
+   `(:model ,chatgpt-model
+     :messages ,(cl-concatenate 'vector
+                                chatgpt-history
+                                `((:role "user"
+                                   :content ,user-message))))))
 
 ;; Define utility functions
 (defun chatgpt--api-request (user-message &optional sync)
-  "Send a USER-MESSAGE to the ChatGPT API and return the response. \nIf SYNC is non-nil, return the response synchronously."
+  "Send a USER-MESSAGE to the ChatGPT API and return the response.
+  If SYNC is non-nil, return the response synchronously."
   (chatgpt--open-window "Loading Response...")
   (request chatgpt-api-url
     :type "POST"
@@ -71,7 +80,9 @@
               (lambda (&key data &allow-other-keys)
                 (chatgpt--parse-response data)))
     :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                          (chatgpt--open-window "Error: API request failed.")))))
+                          (chatgpt--open-window "Error: API request failed. Error pasted in *chat-gpt-error* buffer.")
+                          (switch-to-buffer (get-buffer-create "*scratch*"))
+                          (insert (format "%s" error-thrown))))))
 
 (defun chatgpt--parse-response (response)
   "Parse the RESPONSE from the ChatGPT API and return the text."
@@ -80,10 +91,15 @@
           (assoc-default 'content
                          (assoc-default 'message
                                         (elt choices 0))))
+    (setq chatgpt-history (cl-concatenate 'vector chatgpt-history (list (assoc-default 'message (elt choices 0)))))
     (setq chatgpt-latest-response response-message)
     (chatgpt--open-window response-message)
-    response-message)
-  "Parse the response from the ChatGPT API and return the text.")
+    response-message))
+
+(defun chatgpt--reset-history ()
+  "Reset the history of messages sent to the ChatGPT API."
+  (setq chatgpt-history [])
+  (setq chatgpt-latest-response nil))
 
 (defun chatgpt-paste-response ()
   "Paste the latest response from the ChatGPT API into the current buffer."
@@ -95,24 +111,26 @@
   (if (< (length (window-list)) 2)
       (split-window-right -75))
   (select-window (window-in-direction 'right))
-  (let ((gpt-buffer (get-buffer "ChatGPT Dialogue")))
-    (if gpt-buffer
-        (progn
-          (switch-to-buffer gpt-buffer)
-          (erase-buffer))
-
-      (progn
-        (generate-new-buffer "ChatGPT Dialogue"))
-      (switch-to-buffer (get-buffer "ChatGPT Dialogue")))
+  (let ((gpt-buffer (get-buffer-create "ChatGPT Dialogue")))
+    (switch-to-buffer gpt-buffer)
+    (erase-buffer)
     (visual-line-mode 1)
+    (markdown-mode)
     (insert message)
     (select-window (window-in-direction 'left))))
 
 ;; Define interactive functions
 (defun chatgpt-reply ()
-  "Get a reply from ChatGPT."
+  "Get a reply from ChatGPT. Uses old messages in history."
   (interactive)
   (let ((message (read-string "Message: ")))
+    (chatgpt--api-request message)))
+
+(defun chatgpt-new-reply ()
+  "Get a reply from ChatGPT. Starts a new conversation."
+  (interactive)
+  (let ((message (read-string "Message: ")))
+    (chatgpt--reset-history)
     (chatgpt--api-request message)))
 
 (defun chatgpt-reply-and-paste ()
@@ -157,10 +175,10 @@
     (goto-char point)))
 
 (defun chatgpt-skyrimify ()
-  "Rewrite the selected region of org todo items as Skyrim quests"
+  "Rewrite the selected region of org todo items as Skyrim quests."
   (interactive)
-        (let ((message (concat "Rewrite the following org todo items as Skyrim quests. Rewrite the original todo item in parens at the end of the line.: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
-        (chatgpt--api-request message)))
+  (let ((message (concat "Rewrite the following org todo items as Skyrim quests. Rewrite the original todo item in parens at the end of the line.: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (chatgpt--api-request message)))
 
 ;; Define mode
 (define-minor-mode chatgpt-mode

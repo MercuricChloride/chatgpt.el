@@ -134,7 +134,7 @@
 (defun chatgpt-new-reply (&optional gpt-4?)
   "Get a reply from ChatGPT. Starts a new conversation."
   (interactive)
-  (let ((message (read-string "Message: ")))
+  (let ((message (read-string "New Message: ")))
     (chatgpt-clear-dialogue)
     (chatgpt--api-request message gpt-4?)))
 

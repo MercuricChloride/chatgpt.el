@@ -33,6 +33,7 @@
 
 (require 'request)
 (require 'json)
+(require 'markdown-mode)
 
 ;; Define package-level variables and constants
 (defcustom chatgpt-api-key
@@ -55,32 +56,54 @@
 (defvar chatgpt-history []
   "History of messages sent to the ChatGPT API.")
 
-(defun chatgpt-format-request (user-message)
+(defun chatgpt-format-request (user-message &optional gpt-4?)
   "Format a USER-MESSAGE to the ChatGPT API."
   (json-encode
-   `(:model ,chatgpt-model
+   `(:model ,(if gpt-4? "gpt-4" "gpt-3.5-turbo")
      :messages ,(cl-concatenate 'vector
                                 chatgpt-history
                                 `((:role "user"
                                    :content ,user-message))))))
 
+(defun chatgpt--open-dialogue (message &optional response?)
+  "Opens the *gpt-dialogue* buffer or creates a new one if it doesn't exist"
+  (interactive)
+  (let ((original-window (selected-window))
+        (buf (get-buffer-create "*gpt-dialogue*")))
+    (switch-to-buffer-other-window buf)
+    (unless (= (point-min) (point-max))
+      (goto-char (point-max)))
+    (markdown-mode)
+    (if response?
+        (insert (format "\nRESPONSE: %s\n----------------\n\n\n" message))
+        (insert (format "\nPROMPT: %s\n----------------\n\n\n" message)))
+    (select-window original-window)))
+
+(defun chatgpt-clear-dialogue ()
+  "Deletes all the text in the *gpt-dialogue* buffer and resets the history."
+  (interactive)
+  (with-current-buffer "*gpt-dialogue*"
+    (erase-buffer)
+    (chatgpt-reset-history)))
+
+
 ;; Define utility functions
-(defun chatgpt--api-request (user-message &optional sync)
+(defun chatgpt--api-request (user-message &optional gpt-4?)
   "Send a USER-MESSAGE to the ChatGPT API and return the response.
   If SYNC is non-nil, return the response synchronously."
-  (chatgpt--open-window "Loading Response...")
+  (chatgpt--open-dialogue user-message)
   (request chatgpt-api-url
     :type "POST"
     :headers `(("Authorization" . ,(format "Bearer %s" chatgpt-api-key))
                ("Content-Type" . "application/json"))
-    :data (chatgpt-format-request user-message)
+    :data (chatgpt-format-request user-message gpt-4?)
     :parser 'json-read
-    :sync sync
+
     :success (cl-function
               (lambda (&key data &allow-other-keys)
                 (chatgpt--parse-response data)))
     :error (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                          (chatgpt--open-window "Error: API request failed. Error pasted in *chat-gpt-error* buffer.")
+                          (chatgpt--open-dialogue "Error: API request failed. Error pasted in *chat-gpt-error* buffer.")
                           (switch-to-buffer (get-buffer-create "*scratch*"))
                           (insert (format "%s" error-thrown))))))
 
@@ -93,92 +116,93 @@
                                         (elt choices 0))))
     (setq chatgpt-history (cl-concatenate 'vector chatgpt-history (list (assoc-default 'message (elt choices 0)))))
     (setq chatgpt-latest-response response-message)
-    (chatgpt--open-window response-message)
+    (chatgpt--open-dialogue response-message t)
     response-message))
-
-(defun chatgpt--reset-history ()
-  "Reset the history of messages sent to the ChatGPT API."
-  (setq chatgpt-history [])
-  (setq chatgpt-latest-response nil))
 
 (defun chatgpt-paste-response ()
   "Paste the latest response from the ChatGPT API into the current buffer."
   (interactive
    (insert chatgpt-latest-response)))
 
-(defun chatgpt--open-window (message)
-  "Open a window to display a MESSAGE."
-  (if (< (length (window-list)) 2)
-      (split-window-right -75))
-  (select-window (window-in-direction 'right))
-  (let ((gpt-buffer (get-buffer-create "ChatGPT Dialogue")))
-    (switch-to-buffer gpt-buffer)
-    (erase-buffer)
-    (visual-line-mode 1)
-    (markdown-mode)
-    (insert message)
-    (select-window (window-in-direction 'left))))
-
 ;; Define interactive functions
-(defun chatgpt-reply ()
+(defun chatgpt-reply (&optional gpt-4?)
   "Get a reply from ChatGPT. Uses old messages in history."
   (interactive)
   (let ((message (read-string "Message: ")))
-    (chatgpt--api-request message)))
+    (chatgpt--api-request message gpt-4?)))
 
-(defun chatgpt-new-reply ()
+(defun chatgpt-new-reply (&optional gpt-4?)
   "Get a reply from ChatGPT. Starts a new conversation."
   (interactive)
   (let ((message (read-string "Message: ")))
-    (chatgpt--reset-history)
-    (chatgpt--api-request message)))
+    (chatgpt-clear-dialogue)
+    (chatgpt--api-request message gpt-4?)))
 
-(defun chatgpt-reply-and-paste ()
-  "Get a reply from ChatGPT and insert it at point."
-  (interactive)
-  (let ((message (read-string "Message: ")))
-    (message "Sending message...")
-    (chatgpt--api-request message t)
-    (let ((point (point)))
-      (insert chatgpt-latest-response)
-      (goto-char point))))
-
-(defun chatgpt-explain-region ()
+(defun chatgpt-explain-region (&optional gpt-4?)
   "Explain the selected region using the ChatGPT API."
   (interactive)
   (let ((message (concat "Explain the following code: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
-    (chatgpt--api-request message)))
+    (chatgpt--api-request message gpt-4?)))
 
-(defun chatgpt-refactor-region ()
+(defun chatgpt-refactor-region (&optional gpt-4?)
   "Refactor the selected region using the ChatGPT API."
   (interactive)
   (let ((message (concat "Refactor the following code." (read-string "How should we refactor this code?") "\n" (buffer-substring-no-properties (region-beginning) (region-end)))))
-    (chatgpt--api-request message)))
+    (chatgpt--api-request message gpt-4?)))
 
-(defun chatgpt-document-region ()
+(defun chatgpt-document-region (&optional gpt-4?)
   "Document the selected region using the ChatGPT API."
   (interactive)
   (let ((message (concat "Return this code, but with documentation added as comments to the code: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
-    (chatgpt--api-request message)))
+    (chatgpt--api-request message gpt-4?)))
 
-(defun chatgpt-prompt-region ()
+;; write a function to get what's wrong with a region of code
+(defun chatgpt-debug-region (&optional gpt-4?)
+  "Debug the selected region using the ChatGPT API."
+  (interactive)
+  (let ((message (concat "Debug the following code: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
+    (chatgpt--api-request message gpt-4?)))
+
+(defun chatgpt-prompt-region (&optional gpt-4?)
   "Prompt the user for a message and send the selected region as a context."
   (interactive)
   (let ((message (read-string "Message: ")))
-    (chatgpt--api-request (concat message "\n" (buffer-substring-no-properties (region-beginning) (region-end))))))
+    (chatgpt--api-request (concat message "\n" (buffer-substring-no-properties (region-beginning) (region-end))) gpt-4?)))
 
-(defun chatgpt-paste ()
-  "Paste the latest response from the ChatGPT API into the current buffer."
+(defun chatgpt-reply-gpt-4 ()
+  "Get a reply from GPT-4."
   (interactive)
-  (let ((point (point)))
-    (insert chatgpt-latest-response)
-    (goto-char point)))
+  (chatgpt-reply t))
 
-(defun chatgpt-skyrimify ()
-  "Rewrite the selected region of org todo items as Skyrim quests."
-  (interactive)
-  (let ((message (concat "Rewrite the following org todo items as Skyrim quests. Rewrite the original todo item in parens at the end of the line.: \n" (buffer-substring-no-properties (region-beginning) (region-end)))))
-    (chatgpt--api-request message)))
+(defun chatgpt-new-reply-gpt-4 ()
+        "Get a reply from GPT-4. Starts a new conversation."
+        (interactive)
+        (chatgpt-new-reply t))
+
+(defun chatgpt-explain-region-gpt-4 ()
+        "Explain the selected region using GPT-4."
+        (interactive)
+        (chatgpt-explain-region t))
+
+(defun chatgpt-refactor-region-gpt-4 ()
+        "Refactor the selected region using GPT-4."
+        (interactive)
+        (chatgpt-refactor-region t))
+
+(defun chatgpt-document-region-gpt-4 ()
+        "Document the selected region using GPT-4."
+        (interactive)
+        (chatgpt-document-region t))
+
+(defun chatgpt-debug-region-gpt-4 ()
+        "Debug the selected region using GPT-4."
+        (interactive)
+        (chatgpt-debug-region t))
+
+(defun chatgpt-prompt-region-gpt-4 ()
+        "Prompt the user for a message and send the selected region as a context."
+        (interactive)
+        (chatgpt-prompt-region t))
 
 ;; Define mode
 (define-minor-mode chatgpt-mode

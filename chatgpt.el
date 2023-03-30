@@ -11,6 +11,7 @@
 
 ;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
 ;; Homepage: https://github.com/MercuricChloride/chatgpt.el
+
 ;; Package-Requires: ((emacs "24.3"))
 ;;
 ;; This file is not part of GNU Emacs.
@@ -67,17 +68,22 @@
 
 (defun chatgpt--open-dialogue (message &optional response?)
   "Opens the *gpt-dialogue* buffer or creates a new one if it doesn't exist"
+  (interactive)
   (let ((original-window (selected-window))
         (buf (get-buffer-create "*gpt-dialogue*"))
         (width 75))
     (display-buffer-in-side-window buf `((side . right) (window-width . ,width)))
+    (select-window (get-buffer-window buf))
     (with-current-buffer buf
-      (goto-char (point-max))
       (markdown-mode)
+      (goto-char (point-max))
       (if response?
-        (insert (format "\nRESPONSE: %s\n----------------\n\n\n" message))
-        (insert (format "\nPROMPT: %s\n----------------\n\n\n" message))))
+          (insert (format "\nRESPONSE: %s\n----------------\n\n\n" message))
+        (insert (format "\nPROMPT: %s\n----------------\n\n\n" message)))
+      (goto-char (point-max)))
+    (recenter -1)
     (select-window original-window)))
+
 
 
 (defun chatgpt-clear-dialogue ()
